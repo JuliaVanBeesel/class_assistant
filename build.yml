@@ -1,0 +1,77 @@
+name: Build app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:   # adds a "Run workflow" button in the Actions tab
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false   # if one OS fails, still build the others
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check that tkinter is available
+        run: python -c "import tkinter; print('tkinter OK, Tk', tkinter.TkVersion)"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      # ---- Build: one step per OS, because the flags differ ----
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          pyinstaller --onefile --windowed --name LetterTracker app.py
+          # tar keeps the "executable" permission that a plain upload would drop
+          tar -czf dist/LetterTracker-linux.tar.gz -C dist LetterTracker
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: pyinstaller --onefile --windowed --name LetterTracker app.py
+
+      - name: Build (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          # --windowed makes a proper .app; --onefile is not used on macOS
+          pyinstaller --windowed --name LetterTracker app.py
+          # zip the .app with ditto so permissions survive the upload
+          ditto -c -k --sequesterRsrc --keepParent dist/LetterTracker.app dist/LetterTracker-macos.zip
+
+      # ---- Upload: this is what you download from the Actions page ----
+      - name: Upload (Linux)
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: LetterTracker-linux
+          path: dist/LetterTracker-linux.tar.gz
+
+      - name: Upload (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: LetterTracker-windows
+          path: dist/LetterTracker.exe
+
+      - name: Upload (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: LetterTracker-macos
+          path: dist/LetterTracker-macos.zip

@@ -1,0 +1,14 @@
+# Pupil data must never end up in the repo
+*.csv
+*.txt
+!requirements.txt
+
+# Build output
+build/
+dist/
+*.spec
+
+# Python
+__pycache__/
+*.pyc
+.venv/
